@@ -1,11 +1,8 @@
-import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import compilationRoutes from "./routes/compilationRoutes.js";
-import cors from "cors";
 import amqp from "amqplib/callback_api.js";
+import { compile_cpp } from "./controllers/compilationController.js";
 
-const app = express();
 dotenv.config();
 
 const connectToMongoDB = async () => {
@@ -35,25 +32,20 @@ const connectToRabbitMQ = async () => {
                     durable: false,
                 });
 
-                console.log(
-                    " [*] Waiting for messages in %s. To exit press CTRL+C",
-                    queue
-                );
+                console.log("waiting for messages...");
 
                 channel.consume(
                     queue,
                     function (msg) {
-                        console.log(
-                            "submission_id : %s",
-                            msg.content.toString()
-                        );
-
                         const submission_data = JSON.parse(
                             msg.content.toString()
                         );
 
                         console.log(submission_data);
-                        console.log(submission_data.type);
+
+                        if (submission_data.language == "cpp") {
+                            compile_cpp(submission_data.submission_id);
+                        }
                     },
                     {
                         noAck: true,
@@ -67,26 +59,5 @@ const connectToRabbitMQ = async () => {
     }
 };
 
-app.use(express.json());
-app.use(cors());
-
-app.use("/api/compilation", compilationRoutes);
-
-app.use((err, req, res, next) => {
-    const errStatus = err.status || 500;
-    const errMessage = err.message || "something went worng!";
-    return res.status(errStatus).json({
-        sucess: false,
-        status: errStatus,
-        message: errMessage,
-        stack: err.stack,
-    });
-});
-
-const port = process.env.PORT || 8080;
-
-app.listen(port, () => {
-    connectToMongoDB();
-    connectToRabbitMQ();
-    console.log(`server running on port : ${port}`);
-});
+connectToMongoDB();
+connectToRabbitMQ();
