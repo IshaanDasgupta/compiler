@@ -1,14 +1,55 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import amqp from "amqplib/callback_api.js";
-import { compile_cpp } from "./controllers/compilationController.js";
+import {
+    compile_cpp,
+    compile_cpp_playground,
+} from "./controllers/compilationController.js";
+import { Submission } from "./models/Submission.js";
+import { Playground_Submission } from "./models/Playground_Submission.js";
 
 dotenv.config();
+
+const compile = async (submission_id, type) => {
+    console.log(submission_id, type);
+    if (type === "problem_submission") {
+        const submission = await Submission.findById(submission_id);
+        if (!submission) {
+            console.log("invalid submission");
+            return;
+        }
+
+        if (submission.language === "cpp") {
+            compile_cpp(submission);
+            return;
+        }
+
+        console.log(`language ${submission.language}  not supported`);
+        return;
+    }
+
+    const playground_submission = await Playground_Submission.findById(
+        submission_id
+    );
+
+    if (!playground_submission) {
+        console.log("invalid playground submission");
+        return;
+    }
+
+    if (playground_submission.language === "cpp") {
+        compile_cpp_playground(playground_submission);
+        return;
+    }
+
+    console.log(`language ${playground_submission.language}  not supported`);
+    return;
+};
 
 const connectToMongoDB = async () => {
     try {
         mongoose.connect(process.env.MONGODB_URI);
-        console.log("Connected to MongoDB database");
+        console.log("Connected to mongoDB database");
     } catch (err) {
         throw err;
     }
@@ -41,11 +82,10 @@ const connectToRabbitMQ = async () => {
                             msg.content.toString()
                         );
 
-                        console.log(submission_data);
-
-                        if (submission_data.language == "cpp") {
-                            compile_cpp(submission_data.submission_id);
-                        }
+                        compile(
+                            submission_data.submission_id,
+                            submission_data.type
+                        );
                     },
                     {
                         noAck: true,

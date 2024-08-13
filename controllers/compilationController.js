@@ -1,26 +1,17 @@
 import { execSync } from "child_process";
 import { Submission } from "../models/Submission.js";
+import { Playground_Submission } from "../models/Playground_Submission.js";
 
-export const compile_cpp = async (submission_id) => {
+export const compile_cpp = async (submission) => {
     try {
-        // console.log("\n\ncompiling_cpp\n\n");
-        let submission = await Submission.findById(submission_id);
-
-        // console.log(submission);
-
-        if (!submission) {
-            return "problem not found";
-        }
-
-        // console.log(submission);
+        const submission_id = submission._id;
 
         execSync(
             `echo ${submission.code} | base64 --decode > ./files/${submission_id}.cpp && g++ -o ./files/${submission_id} ./files/${submission_id}.cpp`
         );
 
-        // console.log("\n\n compilation done \n\n");
-
         let total_score = 0;
+        let ac = true;
         submission.test_cases.forEach((data, index) => {
             try {
                 const test_case = data.test_case;
@@ -40,22 +31,20 @@ export const compile_cpp = async (submission_id) => {
 
                 submission.test_cases[index].test_case.output = encoded_output;
 
-                if (test_case.expected_output) {
-                    const testcase_output = execSync(
-                        `echo ${test_case.expected_output} | base64 --decode`
-                    )
-                        .toString()
-                        .trim();
-                    if (output == testcase_output) {
-                        submission.test_cases[index].passed = true;
-                        total_score +=
-                            submission.test_cases[index].test_case.score;
-                    } else {
-                        submission.test_cases[index].passed = false;
-                    }
+                const testcase_output = execSync(
+                    `echo ${test_case.expected_output} | base64 --decode`
+                )
+                    .toString()
+                    .trim();
+                if (output == testcase_output) {
+                    submission.test_cases[index].passed = true;
+                    total_score += submission.test_cases[index].test_case.score;
+                } else {
+                    submission.test_cases[index].passed = false;
+                    ac = false;
                 }
             } catch (err) {
-                return `internal error in ${index} testcase`;
+                return `internal error in ${index} testcase with message ${err}`;
             }
         });
 
@@ -63,16 +52,55 @@ export const compile_cpp = async (submission_id) => {
             `rm ./files/${submission_id} && rm ./files/${submission_id}.cpp && rm ./files/${submission_id}-input.txt`
         );
 
-        // console.log("\n\n removed files \n\n");
-
         submission.total_score = total_score;
         submission.status = "submitted";
-        submission.result = "AC";
-        // console.log(submission);
-
+        submission.result = ac === true ? "AC" : "WA";
         await Submission.findByIdAndUpdate(submission_id, submission);
 
-        console.log("done");
+        console.log(`executed submission with id ${submission_id}`);
+        return;
+    } catch (err) {
+        console.log(err);
+        return;
+    }
+};
+
+export const compile_cpp_playground = async (playground_submission) => {
+    try {
+        const submission_id = playground_submission._id;
+
+        execSync(
+            `echo ${playground_submission.code} | base64 --decode > ./files/${submission_id}.cpp && g++ -o ./files/${submission_id} ./files/${submission_id}.cpp`
+        );
+
+        execSync(
+            `echo ${playground_submission.input} | base64 --decode > ./files/${submission_id}-input.txt `
+        );
+
+        const output = execSync(
+            `./files/${submission_id} < ./files/${submission_id}-input.txt`
+        )
+            .toString()
+            .trim();
+
+        const encoded_output = execSync(`echo ${output} | base64`)
+            .toString()
+            .trim();
+
+        playground_submission.output = encoded_output;
+
+        execSync(
+            `rm ./files/${submission_id} && rm ./files/${submission_id}.cpp && rm ./files/${submission_id}-input.txt`
+        );
+
+        playground_submission.status = "submitted";
+
+        await Playground_Submission.findByIdAndUpdate(
+            submission_id,
+            playground_submission
+        );
+
+        console.log(`executed playground submission with id ${submission_id}`);
 
         return;
     } catch (err) {

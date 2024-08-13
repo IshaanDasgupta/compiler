@@ -26,19 +26,18 @@ export const submission_schema = new mongoose.Schema(
             enum: ["pending", "submitted"],
             required: true,
         },
-        type: {
-            type: String,
-            enum: ["run", "submit"],
-            required: true,
-        },
         test_cases: [
             {
                 test_case: {
                     input: { type: String, required: true },
-                    expected_output: { type: String },
-                    output: { type: String, required: true },
-                    is_hidden: { type: Boolean },
-                    score: { type: Number },
+                    expected_output: { type: String, required: true },
+                    output: { type: String },
+                    is_hidden: {
+                        type: Boolean,
+                        required: true,
+                        default: false,
+                    },
+                    score: { type: Number, default: 0 },
                 },
                 passed: { type: Boolean },
             },
