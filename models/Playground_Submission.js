@@ -12,7 +12,7 @@ export const playground_submission_schema = new mongoose.Schema(
         memory_taken: { type: Number },
         status: {
             type: String,
-            enum: ["pending", "submitted", "failed"],
+            enum: ["pending", "submitted"],
             required: true,
         },
 

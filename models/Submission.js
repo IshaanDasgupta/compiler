@@ -20,10 +20,21 @@ export const submission_schema = new mongoose.Schema(
         },
         time_taken: { type: Number },
         memory_taken: { type: Number },
-        result: { type: String, enum: ["AC", "WA", "TLE", "MLE", "RTE"] },
+        result: {
+            type: String,
+            enum: [
+                "AC",
+                "WA",
+                "Compilation Error",
+                "Runtime Error",
+                "TLE",
+                "MLE",
+                "RTE",
+            ],
+        },
         status: {
             type: String,
-            enum: ["pending", "submitted", "failed"],
+            enum: ["pending", "submitted"],
             required: true,
         },
         test_cases: [

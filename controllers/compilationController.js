@@ -1,6 +1,8 @@
 import { execSync } from "child_process";
 import { Submission } from "../models/Submission.js";
 import { Playground_Submission } from "../models/Playground_Submission.js";
+import { Problem } from "../models/Problem.js";
+import { User } from "../models/User.js";
 
 export const compile_cpp = async (submission) => {
     try {
@@ -11,9 +13,18 @@ export const compile_cpp = async (submission) => {
                 `echo ${submission.code} | base64 --decode > ./files/${submission_id}.cpp && g++ -o ./files/${submission_id} ./files/${submission_id}.cpp`
             );
         } catch (err) {
-            submission.status = "failed";
+            submission.status = "submitted";
+            submission.result = "Compilation Error";
             submission.error = err.toString();
             await Submission.findByIdAndUpdate(submission_id, submission);
+
+            const problem = await Problem.findById(submission.problem_id);
+            problem.wrong_submissions += 1;
+            await problem.save();
+
+            const user = await User.findById(submission.user_id);
+            user.submissions.push(submission_id);
+            await user.save();
 
             return;
         }
@@ -52,9 +63,18 @@ export const compile_cpp = async (submission) => {
                     ac = false;
                 }
             } catch (err) {
-                submission.status = "failed";
+                submission.status = "submitted";
+                submission.result = "Runtime Error";
                 submission.error = err.toString();
                 await Submission.findByIdAndUpdate(submission_id, submission);
+
+                const problem = await Problem.findById(submission.problem_id);
+                problem.wrong_submissions += 1;
+                await problem.save();
+
+                const user = await User.findById(submission.user_id);
+                user.submissions.push(submission_id);
+                await user.save();
 
                 return;
             }
@@ -68,6 +88,30 @@ export const compile_cpp = async (submission) => {
         submission.status = "submitted";
         submission.result = ac === true ? "AC" : "WA";
         await Submission.findByIdAndUpdate(submission_id, submission);
+
+        const user = await User.findById(submission.user_id);
+        user.submissions.push(submission_id);
+        if (
+            submission.status === "AC" &&
+            !user.solved_problems.includes(submission.problem_id)
+        ) {
+            user.solved_problems.push(submission.problem_id);
+        }
+        await user.save();
+
+        const problem = await Problem.findById(submission.problem_id);
+        if (
+            submission.status === "AC" &&
+            !user.correct_submissions.includes(submission.submission.problem_id)
+        ) {
+            problem.correct_submissions += 1;
+        }
+
+        if (submission.status == "WA") {
+            problem.wrong_submissions += 1;
+        }
+
+        await problem.save();
 
         console.log(`executed submission with id ${submission_id}`);
         return;
@@ -86,7 +130,7 @@ export const compile_cpp_playground = async (playground_submission) => {
                 `echo ${playground_submission.code} | base64 --decode > ./files/${submission_id}.cpp && g++ -o ./files/${submission_id} ./files/${submission_id}.cpp`
             );
         } catch (err) {
-            playground_submission.status = "failed";
+            playground_submission.status = "submitted";
             playground_submission.error = err.toString();
             await Playground_Submission.findByIdAndUpdate(
                 submission_id,
@@ -113,7 +157,7 @@ export const compile_cpp_playground = async (playground_submission) => {
 
             playground_submission.output = encoded_output;
         } catch (err) {
-            playground_submission.status = "failed";
+            playground_submission.status = "submitted";
             playground_submission.error = err.toString();
             await Playground_Submission.findByIdAndUpdate(
                 submission_id,
