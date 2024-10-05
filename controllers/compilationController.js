@@ -1,10 +1,6 @@
 import { execSync } from "child_process";
-import { Submission } from "../models/Submission.js";
-import { Playground_Submission } from "../models/Playground_Submission.js";
-import { Problem } from "../models/Problem.js";
-import { User } from "../models/User.js";
 
-export const compile_cpp = async (submission) => {
+export const compile_cpp = async (submission, type) => {
     try {
         const submission_id = submission._id;
 
@@ -16,17 +12,8 @@ export const compile_cpp = async (submission) => {
             submission.status = "submitted";
             submission.result = "Compilation Error";
             submission.error = err.toString();
-            await Submission.findByIdAndUpdate(submission_id, submission);
 
-            const problem = await Problem.findById(submission.problem_id);
-            problem.wrong_submissions += 1;
-            await problem.save();
-
-            const user = await User.findById(submission.user_id);
-            user.submissions.push(submission_id);
-            await user.save();
-
-            return;
+            return submission;
         }
 
         let total_score = 0;
@@ -55,6 +42,7 @@ export const compile_cpp = async (submission) => {
                 )
                     .toString()
                     .trim();
+
                 if (output == testcase_output) {
                     submission.test_cases[index].passed = true;
                     total_score += submission.test_cases[index].test_case.score;
@@ -66,17 +54,8 @@ export const compile_cpp = async (submission) => {
                 submission.status = "submitted";
                 submission.result = "Runtime Error";
                 submission.error = err.toString();
-                await Submission.findByIdAndUpdate(submission_id, submission);
 
-                const problem = await Problem.findById(submission.problem_id);
-                problem.wrong_submissions += 1;
-                await problem.save();
-
-                const user = await User.findById(submission.user_id);
-                user.submissions.push(submission_id);
-                await user.save();
-
-                return;
+                return submission;
             }
         });
 
@@ -87,34 +66,9 @@ export const compile_cpp = async (submission) => {
         submission.total_score = total_score;
         submission.status = "submitted";
         submission.result = ac === true ? "AC" : "WA";
-        await Submission.findByIdAndUpdate(submission_id, submission);
-
-        const user = await User.findById(submission.user_id);
-        user.submissions.push(submission_id);
-        if (
-            submission.status === "AC" &&
-            !user.solved_problems.includes(submission.problem_id)
-        ) {
-            user.solved_problems.push(submission.problem_id);
-        }
-        await user.save();
-
-        const problem = await Problem.findById(submission.problem_id);
-        if (
-            submission.status === "AC" &&
-            !user.correct_submissions.includes(submission.submission.problem_id)
-        ) {
-            problem.correct_submissions += 1;
-        }
-
-        if (submission.status == "WA") {
-            problem.wrong_submissions += 1;
-        }
-
-        await problem.save();
 
         console.log(`executed submission with id ${submission_id}`);
-        return;
+        return submission;
     } catch (err) {
         console.log(err);
         return;
@@ -132,12 +86,8 @@ export const compile_cpp_playground = async (playground_submission) => {
         } catch (err) {
             playground_submission.status = "submitted";
             playground_submission.error = err.toString();
-            await Playground_Submission.findByIdAndUpdate(
-                submission_id,
-                playground_submission
-            );
 
-            return;
+            return playground_submission;
         }
 
         try {
@@ -159,24 +109,14 @@ export const compile_cpp_playground = async (playground_submission) => {
         } catch (err) {
             playground_submission.status = "submitted";
             playground_submission.error = err.toString();
-            await Playground_Submission.findByIdAndUpdate(
-                submission_id,
-                playground_submission
-            );
 
-            return;
+            return playground_submission;
         }
 
         playground_submission.status = "submitted";
-
-        await Playground_Submission.findByIdAndUpdate(
-            submission_id,
-            playground_submission
-        );
-
         console.log(`executed playground submission with id ${submission_id}`);
 
-        return;
+        return playground_submission;
     } catch (err) {
         console.log(err);
         return;
